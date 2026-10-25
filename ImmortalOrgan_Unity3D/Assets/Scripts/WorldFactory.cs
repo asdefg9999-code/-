@@ -5,12 +5,21 @@ namespace ImmortalOrgan
 {
     public static class WorldFactory
     {
+        private static Shader mobileShader;
+
         public static Material MakeMaterial(Color color, bool emissive = false)
         {
-            Shader shader = emissive ? Shader.Find("Unlit/Transparent") : null;
-            if (shader == null) shader = Shader.Find("Standard");
-            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
+            // Runtime-only Shader.Find references can be stripped from Android
+            // players. A Shader asset in Resources is explicitly included.
+            if (mobileShader == null)
+                mobileShader = Resources.Load<Shader>("ImmortalOrganMobile");
+
+            Shader shader = mobileShader;
             if (shader == null) shader = Shader.Find("Unlit/Color");
+            if (shader == null) shader = Shader.Find("Standard");
+            if (shader == null)
+                throw new InvalidOperationException("ImmortalOrganMobile shader is missing from the Android player.");
+
             var mat = new Material(shader);
             mat.color = color;
             if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
