@@ -3,13 +3,23 @@ using UnityEngine;
 namespace ImmortalOrgan
 {
     /// <summary>
-    /// A placeholder 3D humanoid styled after the original Choi Min-ho concept art.
-    /// Replace this procedural mesh with a production-ready rigged model later.
+    /// Uses an optional rigged Min-ho prefab when it is ready. Until then the
+    /// existing procedural character remains the safe Android fallback.
     /// </summary>
     public sealed class AnimeCharacter : MonoBehaviour
     {
+        // Unity Resources path, without the Assets/Resources prefix or .prefab extension.
+        private const string RiggedPrefabPath = "Characters/MinhoRigged";
+
         private PlayerMotor motor;
+        private CharacterController characterController;
         private Transform visualRoot;
+        private Animator rigAnimator;
+        private bool usesRiggedPrefab;
+        private bool hasSpeedParameter;
+        private bool hasGroundedParameter;
+        private bool hasDashParameter;
+        private bool hasSlashParameter;
         private Transform leftArm;
         private Transform rightArm;
         private Transform leftLeg;
@@ -22,6 +32,9 @@ namespace ImmortalOrgan
         public void Build()
         {
             motor = GetComponent<PlayerMotor>();
+            characterController = GetComponent<CharacterController>();
+            if (TryBuildRiggedCharacter()) return;
+
             var body = new GameObject("Minho | Stylized body");
             visualRoot = body.transform;
             visualRoot.SetParent(transform, false);
@@ -85,6 +98,48 @@ namespace ImmortalOrgan
                 new Vector3(0f, -.46f, .12f), new Vector3(.16f, .16f, .16f), crimson);
         }
 
+        private bool TryBuildRiggedCharacter()
+        {
+            GameObject riggedPrefab = Resources.Load<GameObject>(RiggedPrefabPath);
+            if (riggedPrefab == null) return false;
+
+            GameObject instance = Instantiate(riggedPrefab, transform);
+            instance.name = "Minho | Rigged 3D character";
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+
+            Animator candidate = instance.GetComponentInChildren<Animator>(true);
+            if (candidate == null || candidate.runtimeAnimatorController == null)
+            {
+                Debug.LogWarning("[Immortal Organ] MinhoRigged needs an Animator with a controller. " +
+                    "Falling back to the working procedural character.");
+                Destroy(instance);
+                return false;
+            }
+
+            // The player's CharacterController owns movement and collisions.
+            candidate.applyRootMotion = false;
+            visualRoot = instance.transform;
+            rigAnimator = candidate;
+            usesRiggedPrefab = true;
+            hasSpeedParameter = HasParameter("Speed", AnimatorControllerParameterType.Float);
+            hasGroundedParameter = HasParameter("Grounded", AnimatorControllerParameterType.Bool);
+            hasDashParameter = HasParameter("Dash", AnimatorControllerParameterType.Bool);
+            hasSlashParameter = HasParameter("Slash", AnimatorControllerParameterType.Trigger);
+            return true;
+        }
+
+        private bool HasParameter(string name, AnimatorControllerParameterType type)
+        {
+            if (rigAnimator == null) return false;
+            foreach (AnimatorControllerParameter parameter in rigAnimator.parameters)
+            {
+                if (parameter.name == name && parameter.type == type) return true;
+            }
+
+            return false;
+        }
+
         private Transform Limb(string name, Vector3 origin, Material mat, Vector3 scale)
         {
             Transform pivot = new GameObject(name + " pivot").transform;
@@ -95,11 +150,33 @@ namespace ImmortalOrgan
             return pivot;
         }
 
-        public void PlaySlash() => slashTime = .25f;
+        public void PlaySlash()
+        {
+            if (usesRiggedPrefab)
+            {
+                if (hasSlashParameter) rigAnimator.SetTrigger("Slash");
+                return;
+            }
+
+            slashTime = .25f;
+        }
 
         private void Update()
         {
             if (visualRoot == null || motor == null) return;
+
+            if (usesRiggedPrefab)
+            {
+                if (rigAnimator == null) return;
+                if (hasSpeedParameter)
+                    rigAnimator.SetFloat("Speed", motor.IsDashing ? 2f : motor.IsMoving ? 1f : 0f,
+                        .1f, Time.deltaTime);
+                if (hasGroundedParameter)
+                    rigAnimator.SetBool("Grounded", characterController != null && characterController.isGrounded);
+                if (hasDashParameter) rigAnimator.SetBool("Dash", motor.IsDashing);
+                return;
+            }
+
             slashTime = Mathf.Max(0f, slashTime - Time.deltaTime);
             float gait = motor.IsMoving ? Mathf.Sin(motor.MoveCycle) * 25f : 0f;
             float idle = Mathf.Sin(Time.time * 2.2f) * .025f;
