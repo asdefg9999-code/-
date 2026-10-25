@@ -3,8 +3,8 @@ using UnityEngine;
 namespace ImmortalOrgan
 {
     /// <summary>
-    /// Uses an optional rigged Min-ho prefab when it is ready. Until then the
-    /// existing procedural character remains the safe Android fallback.
+    /// Uses an optional authored Min-ho prefab when it is ready; otherwise
+    /// builds the mobile skinned-mesh prototype with primitive fallback.
     /// </summary>
     public sealed class AnimeCharacter : MonoBehaviour
     {
@@ -15,6 +15,7 @@ namespace ImmortalOrgan
         private CharacterController characterController;
         private Transform visualRoot;
         private Animator rigAnimator;
+        private MinhoRuntimeRig runtimeRig;
         private bool usesRiggedPrefab;
         private bool hasSpeedParameter;
         private bool hasGroundedParameter;
@@ -33,7 +34,8 @@ namespace ImmortalOrgan
         {
             motor = GetComponent<PlayerMotor>();
             characterController = GetComponent<CharacterController>();
-            if (TryBuildRiggedCharacter()) return;
+            // Authored art > skinned low-poly rig > last-resort primitives.
+            if (TryBuildRiggedCharacter() || TryBuildRuntimeRig()) return;
 
             var body = new GameObject("Minho | Stylized body");
             visualRoot = body.transform;
@@ -129,6 +131,27 @@ namespace ImmortalOrgan
             return true;
         }
 
+        private bool TryBuildRuntimeRig()
+        {
+            var prototype = new GameObject("Minho | Skinned runtime rig");
+            prototype.transform.SetParent(transform, false);
+            try
+            {
+                runtimeRig = prototype.AddComponent<MinhoRuntimeRig>();
+                runtimeRig.Build(motor, characterController);
+                visualRoot = prototype.transform;
+                Debug.Log("[Immortal Organ] Built the skinned Minho 3D rig prototype.");
+                return true;
+            }
+            catch (System.Exception error)
+            {
+                Debug.LogException(error);
+                runtimeRig = null;
+                Destroy(prototype);
+                return false;
+            }
+        }
+
         private bool HasParameter(string name, AnimatorControllerParameterType type)
         {
             if (rigAnimator == null) return false;
@@ -152,6 +175,12 @@ namespace ImmortalOrgan
 
         public void PlaySlash()
         {
+            if (runtimeRig != null)
+            {
+                runtimeRig.PlaySlash();
+                return;
+            }
+
             if (usesRiggedPrefab)
             {
                 if (hasSlashParameter) rigAnimator.SetTrigger("Slash");
@@ -164,6 +193,7 @@ namespace ImmortalOrgan
         private void Update()
         {
             if (visualRoot == null || motor == null) return;
+            if (runtimeRig != null) return; // The skinned rig animates its own bones.
 
             if (usesRiggedPrefab)
             {
