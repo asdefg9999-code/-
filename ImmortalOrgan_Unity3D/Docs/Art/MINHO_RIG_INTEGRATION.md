@@ -1,6 +1,14 @@
-# v0.2 최민호 3D 캐릭터 제작·연동 명세
+# v0.3 최민호 3D 캐릭터 제작·연동 명세
 
-상태: **원화/정면·측면·후면 시트 제작 완료, 실제 FBX/리깅/Animator/Unity 빌드는 미완료**.
+상태: **원화/3면도 완료, Unity 런타임 스키닝 메시·본 리그·동작 프로토타입 구현.** 최종 아트용 FBX, 수작업 스킨 웨이트, Animator 클립, Unity 컴파일·Android APK 검증은 아직 미완료.
+
+## 이번 단계: 에셋 없이 실행되는 3D 리그
+
+- `Assets/Scripts/MinhoRuntimeRig.cs`가 최민호의 골격(골반/척추/목/머리/상하 팔·다리/손·발/코트)과 하나의 `SkinnedMeshRenderer`를 런타임에 생성한다.
+- 메시에는 `BoneWeight`와 `bindposes`가 들어가며, 동작은 `PlayerMotor` 및 `CharacterController` 상태에 맞춰 코드에서 재생한다: 숨쉬기/이동/점프 자세/대시 자세/혈흔 베기/코트 흔들림.
+- 검은 머리·은빛 앞머리·붉은 눈·남색 롱코트·버건디 안감·좌측 침식 혈관이라는 원화의 핵심 색상과 실루엣을 단순한 저폴리곤 형태로 구현했다.
+- 로딩 우선순위: 실제 제작된 `Resources/Characters/MinhoRigged.prefab` → 런타임 스키닝 리그 → 기존 Primitive 캐릭터.
+- **이 메시는 저폴리곤 프로토타입이다. 이미지로부터 실제 인체 3D를 복원한 것이 아니며 FBX, 전문 리깅, 정교한 얼굴·의상·원화 수준의 품질을 대체하지 않는다.**
 
 ## 기준 디자인
 
@@ -35,15 +43,17 @@
 | `Dash` | Bool | 대시 진행 중 | 회피 상태 |
 | `Slash` | Trigger | `BloodCombat`의 공격 시 호출 | 공격 애니메이션 |
 
-`AnimeCharacter.Build()`는 Prefab을 먼저 시도한다. 없거나 `Animator` 및 Controller가 없으면 **기존 프로시저럴 최민호로 자동 복귀**한다. 따라서 새 모델이 준비되지 않아도 기존 플레이 경험을 보존한다. 단, 잘못된 모델의 재질·스케일·상태 전이는 Animator 존재만으로 검증되지 않으므로 APK 실기기 테스트가 필요하다.
+`AnimeCharacter.Build()`는 Prefab을 먼저 시도한다. 없거나 `Animator` 및 Controller가 없으면 **런타임에 제작한 SkinnedMesh 최민호를 생성**한다. 런타임 생성에도 예외가 발생하면 기존 Primitive 캐릭터로 복귀한다. 따라서 외부 FBX가 없어도 플레이가 가능하도록 설계했다. 단, 재질·스케일·상태 전이는 컴파일 및 APK 실기기 테스트가 필요하다.
 
-## 0.2 작업 체크리스트
+## 0.3 작업 체크리스트
 
 - [x] 기존 캐릭터 원화 확인 및 3면도 제작
 - [x] 선택적 rigged Prefab 연결 지점 작성 및 기존 캐릭터 fallback 유지
+- [x] 플레이어 코드 상태와 연동되는 런타임 스키닝 메시·본 애니메이션 프로토타입 작성
+- [ ] Unity Editor에서 실제 컴파일 성공 확인
+- [ ] Android Cloud Build 재실행 및 Galaxy 화면/애니메이션 확인
 - [ ] 실제 게임용 3D 모델/UV/텍스처
 - [ ] 휴머노이드 리깅과 애니메이션 클립
 - [ ] Unity Animator Controller 및 `MinhoRigged.prefab` 배치
-- [ ] Unity 에디터 컴파일·씬 테스트
-- [ ] Android Cloud Build 및 Galaxy 실기기 테스트
+- [ ] Galaxy S21 Ultra 기준 프레임·드로우콜·발열·배터리 측정
 
